@@ -1,0 +1,497 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Trivia Showdown</title>
+<style>
+  :root{
+    --blue:#0a1fb8; --blue-hi:#1b36e8; --blue-dk:#050e6b; --gold:#ffcc4d; --gold-dk:#c9961a;
+    --ink:#060a3a; --white:#fff; --green:#2fd16b; --red:#ff4b4b;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%;background:#02062e;color:#fff;
+    font-family:"Franklin Gothic Medium","Arial Narrow","Helvetica Neue",Arial,sans-serif;overflow:hidden}
+  button{font-family:inherit;cursor:pointer}
+  .hidden{display:none!important}
+  .screen{position:absolute;inset:0;display:flex;flex-direction:column}
+
+  /* ---------- Setup ---------- */
+  #setup{align-items:center;justify-content:center;padding:24px;overflow:auto;
+    background:radial-gradient(ellipse at 50% 0%,#1b36e8 0%,#0a1fb8 40%,#02062e 100%)}
+  .logo{font-family:Impact,"Arial Black",sans-serif;font-size:clamp(40px,8vw,96px);letter-spacing:.06em;
+    color:var(--gold);text-shadow:0 4px 0 var(--gold-dk),0 8px 18px rgba(0,0,0,.6);margin:0;text-align:center;
+    transform:skewX(-4deg)}
+  .sub{letter-spacing:.35em;text-transform:uppercase;color:#cfd6ff;margin:6px 0 24px;text-align:center;font-size:14px}
+  .panel{background:rgba(2,6,46,.65);border:3px solid var(--gold);border-radius:14px;padding:22px;
+    width:min(900px,100%);box-shadow:0 10px 40px rgba(0,0,0,.5)}
+  .row{display:flex;gap:16px;flex-wrap:wrap}
+  .roles{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:18px}
+  .role{background:var(--blue);border:2px solid #4a5cff;border-radius:10px;padding:12px 14px;font-size:14px;line-height:1.35}
+  .role b{display:block;color:var(--gold);letter-spacing:.1em;text-transform:uppercase;margin-bottom:2px}
+  label{font-size:13px;letter-spacing:.12em;text-transform:uppercase;color:var(--gold)}
+  select,input[type=text]{background:#050e6b;color:#fff;border:2px solid #4a5cff;border-radius:8px;
+    padding:10px 12px;font-size:16px;font-family:inherit;width:100%}
+  select{width:auto}
+  .teams-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;margin:14px 0 20px}
+  .big-btn{background:linear-gradient(#ffd966,#e0a81f);color:var(--ink);border:0;border-radius:10px;
+    font-family:Impact,"Arial Black",sans-serif;font-size:26px;letter-spacing:.08em;padding:14px 36px;
+    box-shadow:0 5px 0 var(--gold-dk),0 10px 20px rgba(0,0,0,.4);transition:transform .08s}
+  .big-btn:active{transform:translateY(3px);box-shadow:0 2px 0 var(--gold-dk)}
+  .center{text-align:center}
+
+  /* ---------- Game ---------- */
+  #game{background:#02062e;padding:10px 14px 0;gap:10px}
+  .topbar{display:flex;align-items:center;justify-content:space-between;gap:10px}
+  .topbar .mini-logo{font-family:Impact,"Arial Black",sans-serif;color:var(--gold);letter-spacing:.08em;font-size:26px;
+    text-shadow:0 2px 0 var(--gold-dk)}
+  .ctrl{display:flex;gap:8px}
+  .small-btn{background:#0a1fb8;color:#fff;border:2px solid #4a5cff;border-radius:8px;padding:7px 12px;font-size:13px;letter-spacing:.06em}
+  .small-btn:hover{background:var(--blue-hi)}
+  #board{flex:1;display:grid;grid-template-columns:repeat(5,1fr);grid-template-rows:auto repeat(5,1fr);gap:8px;
+    background:#000;padding:8px;border-radius:6px;min-height:0}
+  .cat{background:linear-gradient(var(--blue-hi),var(--blue));color:#fff;border:0;border-radius:4px;
+    display:flex;align-items:center;justify-content:center;text-align:center;padding:14px 6px;
+    font-family:Impact,"Arial Black",sans-serif;font-size:clamp(14px,2.4vw,32px);letter-spacing:.06em;text-transform:uppercase;
+    text-shadow:0 2px 3px rgba(0,0,0,.7);box-shadow:inset 0 0 0 2px rgba(255,255,255,.12)}
+  .tile{background:linear-gradient(var(--blue-hi),var(--blue));border:0;border-radius:4px;color:var(--gold);
+    font-family:Impact,"Arial Black",sans-serif;font-size:clamp(28px,5.2vw,76px);
+    text-shadow:3px 3px 0 #000,0 0 14px rgba(255,204,77,.35);box-shadow:inset 0 0 0 2px rgba(255,255,255,.12);
+    transition:transform .12s,filter .12s}
+  .tile:hover:not(:disabled){transform:scale(1.04);filter:brightness(1.25);z-index:2}
+  .tile:disabled{background:#050e6b;color:transparent;text-shadow:none;cursor:default;box-shadow:none;opacity:.55}
+  .tile.flip{animation:flip .5s}
+  @keyframes flip{0%{transform:rotateY(0)}50%{transform:rotateY(90deg)}100%{transform:rotateY(0)}}
+
+  #scores{display:flex;gap:8px;padding:6px 0 12px}
+  .team{flex:1;background:linear-gradient(#1b36e8,#0a1fb8);border:3px solid #000;border-radius:8px;
+    padding:6px 8px 8px;text-align:center;position:relative;min-width:0;transition:box-shadow .2s,transform .2s}
+  .team.control{box-shadow:0 0 0 4px var(--gold),0 0 24px rgba(255,204,77,.6);transform:translateY(-4px)}
+  .team .nm{font-size:clamp(12px,1.5vw,18px);letter-spacing:.06em;text-transform:uppercase;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .team .pts{font-family:Impact,"Arial Black",sans-serif;font-size:clamp(26px,3.6vw,48px);
+    background:#02062e;border-radius:4px;margin:4px 0;padding:2px 0;color:#fff;letter-spacing:.04em;
+    border:2px inset #4a5cff}
+  .team .pts.neg{color:var(--red)}
+  .team .adj{display:flex;gap:6px;justify-content:center}
+  .team .adj button{background:#050e6b;color:#fff;border:1px solid #4a5cff;border-radius:4px;font-size:12px;padding:1px 8px}
+  .team .badge{position:absolute;top:-11px;left:50%;transform:translateX(-50%);background:var(--gold);color:var(--ink);
+    font-size:11px;font-weight:bold;letter-spacing:.14em;padding:1px 8px;border-radius:10px}
+
+  /* ---------- Clue overlay ---------- */
+  #clue{background:radial-gradient(ellipse at center,#1b36e8 0%,#0a1fb8 55%,#050e6b 100%);z-index:10;
+    align-items:center;justify-content:space-between;padding:20px 24px;animation:zoom .35s ease-out}
+  @keyframes zoom{from{transform:scale(.4);opacity:0}to{transform:scale(1);opacity:1}}
+  .clue-head{width:100%;display:flex;justify-content:space-between;align-items:center;color:var(--gold);
+    font-family:Impact,"Arial Black",sans-serif;letter-spacing:.08em;font-size:clamp(18px,2.6vw,34px);text-shadow:0 2px 0 #000}
+  .clue-text{flex:1;display:flex;align-items:center;justify-content:center;text-align:center;max-width:1100px;
+    font-family:Georgia,"Times New Roman",serif;font-weight:bold;text-transform:uppercase;
+    font-size:clamp(26px,4.6vw,64px);line-height:1.25;text-shadow:3px 3px 0 #000;padding:10px}
+  .answer{color:var(--gold);font-size:clamp(22px,3.6vw,48px);text-align:center;min-height:1.4em;
+    font-family:Georgia,serif;font-weight:bold;text-transform:uppercase;text-shadow:2px 2px 0 #000;margin-bottom:8px}
+  .timerbar{width:min(900px,100%);height:14px;background:#02062e;border:2px solid #000;border-radius:7px;overflow:hidden;margin-bottom:12px}
+  .timerbar>div{height:100%;width:100%;background:linear-gradient(90deg,var(--gold),#fff3b0);transition:width .1s linear}
+  .timerbar.low>div{background:var(--red)}
+  .clue-actions{display:flex;gap:10px;flex-wrap:wrap;justify-content:center;margin-bottom:12px}
+  .clue-actions .small-btn{font-size:15px;padding:10px 16px}
+  .award{display:flex;gap:8px;width:100%;max-width:1200px}
+  .award .t{flex:1;background:rgba(2,6,46,.7);border:2px solid #4a5cff;border-radius:8px;padding:8px;text-align:center;min-width:0}
+  .award .t .nm{font-size:14px;letter-spacing:.06em;text-transform:uppercase;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:6px}
+  .award .t.out{opacity:.4}
+  .award button{border:0;border-radius:6px;font-size:18px;font-weight:bold;padding:8px 14px;margin:0 3px;color:#fff}
+  .award .ok{background:var(--green);color:#03270f}
+  .award .no{background:var(--red)}
+  .award button:disabled{opacity:.35;cursor:not-allowed}
+  .award button:hover:not(:disabled){filter:brightness(1.15)}
+
+  /* ---------- End ---------- */
+  #end{align-items:center;justify-content:center;gap:10px;padding:24px;overflow:auto;z-index:20;
+    background:radial-gradient(ellipse at 50% 0%,#1b36e8 0%,#0a1fb8 40%,#02062e 100%)}
+  .podium{width:min(640px,100%);display:flex;flex-direction:column;gap:8px;margin:16px 0}
+  .rank{display:flex;align-items:center;gap:14px;background:#0a1fb8;border:3px solid #000;border-radius:8px;padding:10px 16px;
+    font-size:22px;text-transform:uppercase;letter-spacing:.05em}
+  .rank.first{background:linear-gradient(#ffd966,#e0a81f);color:var(--ink);transform:scale(1.05)}
+  .rank .n{font-family:Impact,sans-serif;font-size:30px;width:34px}
+  .rank .s{margin-left:auto;font-family:Impact,sans-serif;font-size:28px}
+  .confetti{position:fixed;top:-20px;width:10px;height:16px;z-index:30;pointer-events:none;animation:fall linear forwards}
+  @keyframes fall{to{transform:translateY(110vh) rotate(720deg)}}
+
+  @media (max-width:700px){
+    .roles{grid-template-columns:1fr}
+    #scores{flex-wrap:wrap}.team{flex:1 1 30%}
+    .award{flex-wrap:wrap}.award .t{flex:1 1 30%}
+  }
+</style>
+</head>
+<body>
+
+<!-- ============ SETUP ============ -->
+<div id="setup" class="screen">
+  <h1 class="logo">TRIVIA SHOWDOWN</h1>
+  <div class="sub">Dental &bull; General Knowledge &bull; Pop Culture &bull; Aggie Life &bull; Random</div>
+  <div class="panel">
+    <div class="row" style="align-items:center">
+      <label for="teamCount">Number of teams</label>
+      <select id="teamCount"><option>2</option><option>3</option><option>4</option><option selected>5</option><option>6</option><option>7</option><option>8</option></select>
+      <span style="color:#cfd6ff;font-size:14px">&nbsp;about 5 players per team</span>
+    </div>
+    <div class="teams-grid" id="teamInputs"></div>
+    <div class="center"><button class="big-btn" id="startBtn">START GAME</button></div>
+  </div>
+</div>
+
+<!-- ============ GAME ============ -->
+<div id="game" class="screen hidden">
+  <div class="topbar">
+    <div class="mini-logo">TRIVIA SHOWDOWN</div>
+    <div class="ctrl">
+      <button class="small-btn" id="musicBtn">🎵 Music on</button>
+      <button class="small-btn" id="muteBtn">🔊 Effects on</button>
+      <button class="small-btn" id="endBtn">End game</button>
+    </div>
+  </div>
+  <div id="board"></div>
+  <div id="scores"></div>
+</div>
+
+<!-- ============ CLUE ============ -->
+<div id="clue" class="screen hidden">
+  <div class="clue-head"><span id="clueCat"></span><span id="clueVal"></span></div>
+  <div class="clue-text" id="clueText"></div>
+  <div class="answer" id="clueAnswer"></div>
+  <div class="timerbar" id="timerBar"><div id="timerFill"></div></div>
+  <div class="clue-actions">
+    <button class="small-btn" id="backBtn">← Back to board</button>
+    <button class="small-btn" id="timerBtn">⏱ Start timer (T)</button>
+    <button class="small-btn" id="revealBtn">👁 Reveal answer (Space)</button>
+    <button class="small-btn" id="skipBtn">Nobody got it →</button>
+  </div>
+  <div class="award" id="award"></div>
+</div>
+
+<!-- ============ END ============ -->
+<div id="end" class="screen hidden">
+  <h1 class="logo" style="font-size:clamp(36px,7vw,80px)">FINAL SCORES</h1>
+  <div id="winnerLine" class="sub" style="color:var(--gold);font-size:18px"></div>
+  <div class="podium" id="podium"></div>
+  <button class="big-btn" id="againBtn">PLAY AGAIN</button>
+</div>
+
+<script>
+/* =====================================================================
+   QUESTIONS  –  edit freely. Each category needs 5 clues (100–500).
+   ===================================================================== */
+const VALUES = [100, 200, 300, 400, 500];
+const CATEGORIES = [
+  { name: "Dental", clues: [
+    ["What is the hardest substance in the human body?", "Tooth enamel"],
+    ["What sticky film of bacteria builds up on teeth and causes cavities?", "Plaque"],
+    ["What mineral added to toothpaste and water helps prevent tooth decay?", "Fluoride"],
+    ["What layer of the tooth sits beneath the enamel and makes up most of its structure?", "Dentin"],
+    ["Dentist joke: What time do you go to the dentist?", "Tooth-hurty (2:30)"]
+  ]},
+  { name: "General Knowledge", clues: [
+    ["How many bones are in the adult human body?", "206"],
+    ["What is the largest planet in our solar system?", "Jupiter"],
+    ["What is the chemical symbol for gold?", "Au"],
+    ["What is the largest ocean on Earth?", "The Pacific Ocean"],
+    ["Which fruit is the only one that wears its seeds on the outside?", "The strawberry"]
+  ]},
+  { name: "Pop Culture", clues: [
+    ["In The Hunger Games, what is the name of the fictional country?", "Panem"],
+    ["What is the name of the school Harry Potter attends?", "Hogwarts"],
+    ["Which singer released the 2022 album “Midnights”?", "Taylor Swift"],
+    ["In Marvel comics and films, what is the name of Thor’s hammer?", "Mjölnir"],
+    ["In Mario Kart, what dreaded spiky item flies over the track to blast whoever is in first place?", "The blue shell"]
+  ]},
+  { name: "Aggie Life", clues: [
+    ["What is the name of Texas A&M’s beloved collie mascot?", "Reveille"],
+    ["What is the traditional Aggie greeting?", "Howdy"],
+    ["What massive stack of logs, burned before the t.u. game, was a famous Aggie tradition?", "Bonfire"],
+    ["What is the name of Texas A&M’s football stadium?", "Kyle Field"],
+    ["At Aggie football games, what do Aggies traditionally do with their dates after every score?", "Kiss them!"]
+  ]},
+  { name: "Random", clues: [
+    ["What is the only continent without an active volcano?", "Australia"],
+    ["How many sides does a hexagon have?", "Six"],
+    ["What is the fastest land animal?", "The cheetah"],
+    ["What is the capital city of Australia?", "Canberra"],
+    ["What is the wonderfully fancy name for a group of flamingos?", "A flamboyance"]
+  ]}
+];
+const TIMER_SECONDS = 20;
+
+/* =====================================================================
+   SOUND  –  all synthesized with the Web Audio API (no audio files)
+   ===================================================================== */
+let actx = null, muted = false;
+function ac(){ if(!actx){ try{ actx = new (window.AudioContext||window.webkitAudioContext)(); }catch(e){} } 
+  if(actx && actx.state==="suspended") actx.resume(); return actx; }
+function tone(freq, start, dur, type="sine", vol=0.2, slideTo=null){
+  const a = ac(); if(!a || muted) return;
+  const t0 = a.currentTime + start;
+  const o = a.createOscillator(), g = a.createGain();
+  o.type = type; o.frequency.setValueAtTime(freq, t0);
+  if(slideTo) o.frequency.exponentialRampToValueAtTime(slideTo, t0+dur);
+  g.gain.setValueAtTime(0.0001, t0);
+  g.gain.exponentialRampToValueAtTime(vol, t0+0.02);
+  g.gain.exponentialRampToValueAtTime(0.0001, t0+dur);
+  o.connect(g).connect(a.destination); o.start(t0); o.stop(t0+dur+0.05);
+}
+const SFX = {
+  start(){ [262,330,392,523,659,784].forEach((f,i)=>{ tone(f,i*0.11,0.35,"triangle",0.22); tone(f/2,i*0.11,0.35,"sine",0.12); }); },
+  select(){ tone(300,0,0.25,"square",0.1,900); tone(600,0.05,0.25,"triangle",0.12,1200); },
+  reveal(){ tone(523,0,0.18,"triangle",0.2); tone(784,0.12,0.4,"triangle",0.2); },
+  correct(){ tone(880,0,0.25,"sine",0.28); tone(1318,0.12,0.6,"sine",0.28); tone(1760,0.12,0.5,"triangle",0.08); },
+  wrong(){ tone(120,0,0.7,"sawtooth",0.25); tone(90,0,0.7,"square",0.15); },
+  tick(){ tone(1000,0,0.06,"square",0.08); },
+  timeup(){ tone(150,0,0.35,"sawtooth",0.28); tone(150,0.45,0.6,"sawtooth",0.28); },
+  skip(){ tone(400,0,0.3,"triangle",0.15,200); },
+  fanfare(){ [523,659,784,1047,784,1047,1319].forEach((f,i)=>{ tone(f,i*0.16,0.4,"triangle",0.25); tone(f/2,i*0.16,0.4,"sine",0.15); }); },
+  bonus(){ tone(660,0,0.12,"triangle",0.15); tone(880,0.1,0.18,"triangle",0.15); }
+};
+
+/* =====================================================================
+   BACKGROUND MUSIC  –  an original looping tune, synthesized live
+   ===================================================================== */
+const MELODY = [
+  76,79,76,72,74,76,79,0,   76,81,76,72,69,72,76,0,
+  77,81,77,72,74,77,81,0,   79,74,71,74,79,74,71,0,
+  76,79,84,79,76,79,72,0,   81,79,76,72,76,79,81,0,
+  77,79,81,84,81,77,74,0,   79,77,74,71,72,0,0,0
+];
+const ROOTS = [48,45,41,43,48,45,41,43];
+const STEP = 0.2;                 // seconds per eighth note (~150 bpm)
+let musicOn = true, duck = false, musicGain = null, musicId = null, musicStep = 0, nextT = 0, noiseBuf = null;
+const mf = m => 440*Math.pow(2,(m-69)/12);
+
+function applyMusicGain(){
+  if(!musicGain) return;
+  const v = (muted || !musicOn) ? 0 : (duck ? 0.35 : 1);
+  musicGain.gain.setTargetAtTime(v, actx.currentTime, 0.15);
+}
+function mnote(midi, t, dur, type, vol){
+  const o = actx.createOscillator(), g = actx.createGain();
+  o.type = type; o.frequency.value = mf(midi);
+  g.gain.setValueAtTime(0.0001, t);
+  g.gain.exponentialRampToValueAtTime(vol, t+0.015);
+  g.gain.exponentialRampToValueAtTime(0.0001, t+dur);
+  o.connect(g).connect(musicGain); o.start(t); o.stop(t+dur+0.05);
+}
+function mkick(t){
+  const o = actx.createOscillator(), g = actx.createGain();
+  o.frequency.setValueAtTime(150,t); o.frequency.exponentialRampToValueAtTime(45,t+0.12);
+  g.gain.setValueAtTime(0.35,t); g.gain.exponentialRampToValueAtTime(0.0001,t+0.2);
+  o.connect(g).connect(musicGain); o.start(t); o.stop(t+0.25);
+}
+function mhat(t, vol){
+  const s = actx.createBufferSource(), g = actx.createGain(), f = actx.createBiquadFilter();
+  s.buffer = noiseBuf; f.type = "highpass"; f.frequency.value = 7000;
+  g.gain.setValueAtTime(vol,t); g.gain.exponentialRampToValueAtTime(0.0001,t+0.05);
+  s.connect(f).connect(g).connect(musicGain); s.start(t); s.stop(t+0.07);
+}
+function scheduleStep(i, t){
+  const bar = Math.floor(i/8), s = i%8, root = ROOTS[bar%8];
+  const m = MELODY[i%64];
+  if(m){ mnote(m, t, STEP*1.6, "triangle", 0.11); mnote(m+12, t, STEP*0.8, "sine", 0.03); }
+  if(s%2===0) mnote(s%4===0 ? root : root+7, t, STEP*1.7, "square", 0.05);       // bouncy bass
+  if(s===0 || s===4) mkick(t);
+  mhat(t, s%2 ? 0.07 : 0.03);
+  if(s===2 || s===6) mnote(root+24, t, STEP*0.5, "square", 0.025);              // offbeat chord stab
+}
+function startMusic(){
+  const a = ac(); if(!a || musicId) return;
+  if(!musicGain){
+    musicGain = a.createGain(); musicGain.gain.value = 0; musicGain.connect(a.destination);
+    noiseBuf = a.createBuffer(1, a.sampleRate*0.2, a.sampleRate);
+    const d = noiseBuf.getChannelData(0); for(let i=0;i<d.length;i++) d[i]=Math.random()*2-1;
+  }
+  musicStep = 0; nextT = a.currentTime + 0.1; applyMusicGain();
+  musicId = setInterval(()=>{
+    while(nextT < actx.currentTime + 0.25){ scheduleStep(musicStep, nextT); musicStep++; nextT += STEP; }
+  }, 60);
+}
+function setDuck(v){ duck = v; applyMusicGain(); }
+
+/* =====================================================================
+   STATE
+   ===================================================================== */
+const $ = id => document.getElementById(id);
+let teams = [];            // {name, score}
+let used = new Set();      // "c-r"
+let control = 0;           // team whose turn it is to pick
+let cur = null;            // {c,r,revealed,tried:Set}
+let timer = {on:false, left:TIMER_SECONDS, id:null};
+
+/* ---------- Setup screen ---------- */
+function buildTeamInputs(){
+  const n = +$("teamCount").value;
+  const old = [...document.querySelectorAll("#teamInputs input")].map(i=>i.value);
+  $("teamInputs").innerHTML = "";
+  for(let i=0;i<n;i++){
+    const d = document.createElement("div");
+    d.innerHTML = `<label>Team ${i+1}</label><input type="text" maxlength="18" value="${(old[i]||("Team "+(i+1))).replace(/"/g,"&quot;")}">`;
+    $("teamInputs").appendChild(d);
+  }
+}
+$("teamCount").addEventListener("change", buildTeamInputs);
+buildTeamInputs();
+
+$("startBtn").addEventListener("click", ()=>{
+  ac();
+  teams = [...document.querySelectorAll("#teamInputs input")].map((i,idx)=>({name:i.value.trim()||("Team "+(idx+1)), score:0}));
+  used = new Set(); control = Math.floor(Math.random()*teams.length); cur = null;
+  $("setup").classList.add("hidden"); $("end").classList.add("hidden"); $("game").classList.remove("hidden");
+  renderBoard(true); renderScores(); SFX.start(); setDuck(false); startMusic();
+});
+
+/* ---------- Board ---------- */
+function renderBoard(animate){
+  const b = $("board"); b.innerHTML = "";
+  CATEGORIES.forEach(c=>{ const h=document.createElement("div"); h.className="cat"; h.textContent=c.name; b.appendChild(h); });
+  VALUES.forEach((v,r)=>{
+    CATEGORIES.forEach((c,ci)=>{
+      const t=document.createElement("button"); t.className="tile"; t.textContent="$"+v;
+      t.disabled = used.has(ci+"-"+r);
+      if(animate){ t.classList.add("flip"); t.style.animationDelay=(ci*0.12+r*0.06)+"s"; }
+      t.addEventListener("click",()=>openClue(ci,r));
+      b.appendChild(t);
+    });
+  });
+}
+function renderScores(){
+  const s = $("scores"); s.innerHTML = "";
+  teams.forEach((t,i)=>{
+    const d=document.createElement("div"); d.className="team"+(i===control?" control":"");
+    d.innerHTML = `${i===control?'<div class="badge">PICKS</div>':''}
+      <div class="nm" title="${t.name}">${t.name}</div>
+      <div class="pts ${t.score<0?'neg':''}">${t.score<0?'-':''}$${Math.abs(t.score)}</div>
+      <div class="adj"><button data-d="-100">−100</button><button data-d="100">+100</button><button data-c="1">Pick</button></div>`;
+    d.querySelectorAll("button").forEach(btn=>btn.addEventListener("click",()=>{
+      if(btn.dataset.c){ control=i; } else { t.score += +btn.dataset.d; }
+      SFX.bonus(); renderScores();
+    }));
+    s.appendChild(d);
+  });
+}
+
+/* ---------- Clue ---------- */
+function openClue(c,r){
+  cur = {c,r,revealed:false,tried:new Set()};
+  const [q] = CATEGORIES[c].clues[r];
+  $("clueCat").textContent = CATEGORIES[c].name.toUpperCase();
+  $("clueVal").textContent = "$"+VALUES[r];
+  $("clueText").textContent = q;
+  $("clueAnswer").textContent = "";
+  $("revealBtn").disabled = false;
+  resetTimer();
+  renderAward();
+  $("clue").classList.remove("hidden");
+  setDuck(true);
+  SFX.select();
+}
+function renderAward(){
+  const a = $("award"); a.innerHTML = "";
+  const v = VALUES[cur.r];
+  teams.forEach((t,i)=>{
+    const d=document.createElement("div"); d.className="t"+(cur.tried.has(i)?" out":"");
+    d.innerHTML = `<div class="nm">${t.name}</div>
+      <button class="ok" title="Correct">✔ +${v}</button><button class="no" title="Incorrect">✘ −${v}</button>`;
+    const [ok,no] = d.querySelectorAll("button");
+    ok.disabled = no.disabled = cur.tried.has(i);
+    ok.addEventListener("click",()=>{ t.score+=v; control=i; SFX.correct(); finishClue(); });
+    no.addEventListener("click",()=>{
+      t.score-=v; cur.tried.add(i); SFX.wrong(); renderAward(); renderScores();
+      if(cur.tried.size===teams.length){ revealAnswer(); }
+    });
+    a.appendChild(d);
+  });
+}
+function revealAnswer(){
+  if(cur.revealed) return;
+  cur.revealed = true; stopTimer();
+  $("clueAnswer").textContent = CATEGORIES[cur.c].clues[cur.r][1];
+  $("revealBtn").disabled = true; SFX.reveal();
+}
+function finishClue(){
+  stopTimer();
+  if(!cur.revealed) revealAnswer();
+  used.add(cur.c+"-"+cur.r);
+  const done = used.size >= CATEGORIES.length*VALUES.length;
+  setTimeout(()=>{
+    $("clue").classList.add("hidden"); cur=null; renderBoard(false); renderScores();
+    if(done) showEnd(); else setDuck(false);
+  }, 1100);
+}
+
+/* ---------- Timer ---------- */
+function resetTimer(){ stopTimer(); timer.left = TIMER_SECONDS; paintTimer(); $("timerBtn").textContent="⏱ Start timer (T)"; }
+function stopTimer(){ clearInterval(timer.id); timer.on=false; }
+function paintTimer(){
+  $("timerFill").style.width = (timer.left/TIMER_SECONDS*100)+"%";
+  $("timerBar").classList.toggle("low", timer.left<=5);
+}
+function toggleTimer(){
+  if(!cur) return;
+  if(timer.on){ stopTimer(); $("timerBtn").textContent="⏱ Resume timer (T)"; return; }
+  if(timer.left<=0) timer.left = TIMER_SECONDS;
+  timer.on = true; $("timerBtn").textContent="⏸ Pause timer (T)";
+  let lastSec = Math.ceil(timer.left);
+  timer.id = setInterval(()=>{
+    timer.left = Math.max(0, timer.left-0.1); paintTimer();
+    const sec = Math.ceil(timer.left);
+    if(sec!==lastSec){ lastSec=sec; if(sec<=5 && sec>0) SFX.tick(); }
+    if(timer.left<=0){ stopTimer(); SFX.timeup(); $("timerBtn").textContent="⏱ Restart timer (T)"; }
+  },100);
+}
+
+$("timerBtn").addEventListener("click", toggleTimer);
+$("revealBtn").addEventListener("click", revealAnswer);
+$("skipBtn").addEventListener("click", ()=>{ SFX.skip(); finishClue(); });
+$("backBtn").addEventListener("click", ()=>{ stopTimer(); $("clue").classList.add("hidden"); cur=null; setDuck(false); });
+
+document.addEventListener("keydown", e=>{
+  if(!cur) return;
+  if(e.code==="Space"){ e.preventDefault(); revealAnswer(); }
+  else if(e.key==="t"||e.key==="T"){ toggleTimer(); }
+  else if(e.key==="Escape"){ $("backBtn").click(); }
+});
+
+/* ---------- Controls ---------- */
+$("muteBtn").addEventListener("click", ()=>{
+  muted = !muted; $("muteBtn").textContent = muted ? "🔇 Effects off" : "🔊 Effects on"; applyMusicGain();
+});
+$("musicBtn").addEventListener("click", ()=>{
+  musicOn = !musicOn; $("musicBtn").textContent = musicOn ? "🎵 Music on" : "🎵 Music off"; applyMusicGain();
+});
+$("endBtn").addEventListener("click", ()=>{ if(confirm("End the game and show final scores?")) showEnd(); });
+
+/* ---------- End ---------- */
+function showEnd(){
+  stopTimer(); $("clue").classList.add("hidden"); setDuck(true);
+  const sorted = teams.map(t=>({...t})).sort((a,b)=>b.score-a.score);
+  const top = sorted[0].score, winners = sorted.filter(t=>t.score===top).map(t=>t.name);
+  $("winnerLine").textContent = winners.length>1 ? "IT'S A TIE: "+winners.join(" & ") : "CONGRATULATIONS, "+winners[0].toUpperCase()+"!";
+  const p = $("podium"); p.innerHTML = "";
+  let rank = 0, prev = null;
+  sorted.forEach((t,i)=>{
+    if(t.score!==prev){ rank=i+1; prev=t.score; }
+    const d=document.createElement("div"); d.className="rank"+(t.score===top?" first":"");
+    d.innerHTML = `<span class="n">${rank}</span><span>${t.name}</span><span class="s">${t.score<0?'-':''}$${Math.abs(t.score)}</span>`;
+    p.appendChild(d);
+  });
+  $("game").classList.add("hidden"); $("end").classList.remove("hidden");
+  SFX.fanfare(); confetti();
+}
+function confetti(){
+  const colors=["#ffcc4d","#fff","#1b36e8","#2fd16b","#ff4b4b"];
+  for(let i=0;i<90;i++){
+    const c=document.createElement("div"); c.className="confetti";
+    c.style.left=Math.random()*100+"vw"; c.style.background=colors[i%colors.length];
+    c.style.animationDuration=(2.5+Math.random()*3)+"s"; c.style.animationDelay=(Math.random()*1.2)+"s";
+    document.body.appendChild(c); setTimeout(()=>c.remove(),7500);
+  }
+}
+$("againBtn").addEventListener("click", ()=>{ $("end").classList.add("hidden"); $("setup").classList.remove("hidden"); });
+</script>
+</body>
+</html>
